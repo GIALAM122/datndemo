@@ -2,12 +2,12 @@ import { useEffect, useState, useContext } from "react";
 import LayoutForm from "@/components/layout-form";
 import TextInput from "@/components/text-input";
 import Link from "next/link";
-import axios from "axios";
 import { useRouter } from "next/router";
 import { AiOutlineLoading } from "react-icons/ai";
 import { validate } from "@/feature/validation";
 import AuthContext from "@/feature/auth-context";
-
+import axios from "axios";
+import ModalRegister from "@/components/modal/mdregister";
 export default function Register() {
   const { userInfo } = useContext(AuthContext);
   const [loading, setLoading] = useState(false);
@@ -17,73 +17,56 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [errorInput, setErrorInput] = useState(null);
   const [checkRule, setCheckRule] = useState(null);
+  const [showModal, setShowModal] = useState(false);
   const router = useRouter();
-  const authorizeAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).send('Access denied');
-    }
-    next();
-};
 
   const handleRegister = async () => {
+    const role = account === "lamadmin@gmail.com" ? "admin" : "user"; // Define role here
     const listInput = [
-      {
-        type: "password",
-        input: password,
-      },
-      {
-        type: "account",
-        input: account,
-      },
-      {
-        type: "phone",
-        input: phone,
-      },
-      {
-        type: "name",
-        input: name,
-      },
-      {
-        type: "role",
-        input: role,
-      },
+      { type: "password", input: password },
+      { type: "account", input: account },
+      { type: "phone", input: phone },
+      { type: "name", input: name },
+      { type: "role", input: role },
     ];
     setErrorInput(validate(listInput));
-  };
-  const postData = async () => {
-    const role = account === 'lamadmin@gmail.com' ? 'admin' : 'user';
-    setLoading(true);
-    const res = await axios.post("/api/auth", {
-      account,
-      password,
-      phone,
-      name,
-      role,
-    });
-    const data = await res.data;
-    setLoading(false);
-    if (data.login) {
-      alert("Tạo tài khoản thành công");
-      router.push("/login");
-    } else {
-      alert("Tài khoản đã có người sử dụng");
+    if (Object.keys(validate(listInput)).length === 0) {
+      postData(role); // Pass role to postData
     }
   };
+
+  const postData = async (role) => {
+    setLoading(true);
+    try {
+      const res = await axios.post("/api/auth", {
+        account,
+        password,
+        phone,
+        name,
+        role,
+      });
+      const data = await res.data;
+      setLoading(false);
+      if (data.login) {
+        setShowModal(true); // Show modal on success
+        setTimeout(() => {
+          router.push("/login");
+        }, 2000); // Redirect after 2 seconds
+      } else {
+        alert("Tài khoản đã có người sử dụng");
+      }
+    } catch (error) {
+      console.error("Error creating account:", error);
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (userInfo) {
       router.push("/user");
     }
   }, [userInfo]);
-  useEffect(() => {
-    if (errorInput && Object.keys(errorInput).length === 0) {
-      postData();
-    }
-  }, [errorInput]);
 
-  app.get('/admin/', authorizeAdmin, (req, res) => {
-    const database = readDatabase();
-    res.status(200).send(database.users);
-});
   return (
     <LayoutForm>
       <h2 className="oswald uppercase text-4xl mt-10">Tạo tài khoản mới</h2>
@@ -120,9 +103,7 @@ export default function Register() {
           onChange={() => setCheckRule(!checkRule)}
         />
         <span>Tôi đã đọc và đồng ý với</span>
-        <span className="font-bold ml-1 capitalize">
-          chính sách hoạt động của 
-        </span>
+        <span className="font-bold ml-1 capitalize">chính sách hoạt động của</span>
         {checkRule === false && (
           <span className="absolute text-xs text-red-400 bottom-[-20px]">
             Bạn chưa đồng ý với điều khoản dịch vụ
@@ -150,6 +131,13 @@ export default function Register() {
           Đăng nhập
         </Link>
       </div>
+      {showModal && (
+        <ModalRegister
+          message="Tạo tài khoản thành công"
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </LayoutForm>
+    
   );
 }

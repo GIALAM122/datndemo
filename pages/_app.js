@@ -14,9 +14,10 @@ import Loading from "@/components/loading"; // Import Loading component
 import Modal from "@/components/alert"; // Import Modal component
 
 export default function App({ Component, pageProps }) {
+  
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
-  const [showModal, setShowModal] = useState(false); 
+  const [showModal, setShowModal] = useState(false); // State để kiểm soát modal
   const router = useRouter();
 
   useEffect(() => {
@@ -30,16 +31,19 @@ export default function App({ Component, pageProps }) {
             const userData = userDocSnap.data();
             setUserRole(userData.role);
 
-          
+            // Kiểm tra quyền truy cập admin
             if (userData.role !== 'admin' && router.pathname.startsWith('/admin')) {
-              setShowModal(true); 
+              setShowModal(true);
             }
           } else {
             router.push('/'); 
           }
         }
       } else {
-        router.push('/login'); 
+        
+        if (router.pathname.startsWith('/admin')) {
+          setShowModal(true); 
+        }
       }
       setLoading(false);
     });
@@ -49,13 +53,14 @@ export default function App({ Component, pageProps }) {
 
   const closeModal = () => {
     setShowModal(false);
-    router.push('/'); 
+    setLoading(true);
+    router.push('/'); // Chuyển hướng về trang chủ sau khi đóng modal
   };
 
-  if (loading) return <Loading />; 
+  if (loading) return <Loading />; // Sử dụng Loading component
 
   if (showModal) {
-    return <Modal message="Bạn không đủ quyền truy cập vào trang này" onClose={closeModal} />; // Hiển thị modal nếu không phải admin
+    return <Modal message="Bạn không đủ quyền truy cập vào trang này" onClose={closeModal} />; // Hiển thị modal nếu không đủ quyền
   }
 
   const LayoutComponent = Component.layout || Layout;

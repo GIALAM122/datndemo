@@ -4,6 +4,7 @@ import { collection, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase
 import { storage } from '@/feature/firebase/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Admin from "./layouts/Admin";
+import { IoIosAddCircle } from "react-icons/io";
 
 const DanhMucSach = () => {
     const [categories, setCategories] = useState([]);
@@ -144,14 +145,14 @@ const DanhMucSach = () => {
 
             <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
+                className="bg-blue-500 text-white px-4 py-2 rounded mb-4 flex items-center"
             >
-                Thêm danh mục mới
+                <IoIosAddCircle className="mr-2" />   Thêm danh mục mới
             </button>
 
             <table className="min-w-full bg-white border border-gray-300 shadow-md rounded-lg">
                 <thead>
-                <tr className="bg-blue-500 text-white">
+                    <tr className="bg-blue-500 text-white">
                         <th className="py-3 px-4 border-b font-semibold text-center">ID</th>
                         <th className="py-3 px-4 border-b font-semibold text-center">Tên danh mục</th>
                         <th className="py-3 px-4 border-b font-semibold text-center">Hình ảnh</th>
@@ -167,72 +168,110 @@ const DanhMucSach = () => {
                                 <img src={category.img} alt={category.name} className="w-16 h-16 object-cover mx-auto" />
                             </td>
                             <td className="py-3 px-4 border-b text-center">
-                                <button onClick={() => handleOpenEditModal(category)} className="bg-yellow-500 text-white px-3 py-1 rounded mx-1">
-                                    Sửa
+                                <button onClick={() => handleOpenEditModal(category)} className="bg-yellow-500 text-white w-[80px] px-3 py-2 rounded mx-1">
+                                <i class="fa-solid fa-pen"></i>
                                 </button>
-                                <button onClick={() => confirmDeleteCategory(category.id)} className="bg-red-500 text-white px-3 py-1 rounded mx-1">
-                                    Xóa
+                                <button onClick={() => confirmDeleteCategory(category.id)} className="bg-red-500 text-white  w-[80px] px-3 py-2 rounded mx-1">
+                                <i class="fa-solid fa-trash"></i>
                                 </button>
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
-
             {isAddModalOpen && (
                 <div className="modal-overlay" onClick={resetForm}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2 className="text-xl font-bold mb-2">Thêm danh mục mới</h2>
-                        <form onSubmit={handleAddCategory}>
-                            <input
-                                type="text"
-                                placeholder="Tên danh mục"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="border p-2 mb-2 w-full"
-                                required
-                            />
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => setImgFile(e.target.files[0])}
-                                className="border p-2 mb-2 w-full"
-                                required
-                            />
-                            <div className="flex justify-between">
-                                <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded">
-                                    Thêm
-                                </button>
-                                <button type="button" onClick={resetForm} className="bg-red-500 text-white px-4 py-2 rounded">
-                                    Đóng
-                                </button>
-                            </div>
-                        </form>
+                    <div
+                        className="modal max-w-none !w-[800px] flex flex-col md:flex-row space-x-4 p-6 bg-white rounded-lg mx-auto"
+                        style={{ maxWidth: '90vw' }} // Để tương thích trên các màn hình nhỏ
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="md:w-1/2 flex flex-col justify-between">
+                            <h2 className="text-xl font-bold mb-2">Thêm danh mục mới</h2>
+                            <form onSubmit={handleAddCategory} className="w-full">
+                                <input
+                                    type="text"
+                                    placeholder="Tên danh mục"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="border p-2 mb-2 w-full"
+                                    required
+                                />
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                        setImgFile(e.target.files[0]);
+                                        const url = URL.createObjectURL(e.target.files[0]);
+                                        setImgURL(url);
+                                    }}
+                                    className="border p-2 mb-2 w-full"
+                                    required
+                                />
+                                <div className="flex justify-between">
+                                    <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded w-full md:w-auto">
+                                        Thêm
+                                    </button>
+                                    <button type="button" onClick={resetForm} className="bg-red-500 text-white px-4 py-2 rounded w-full md:w-auto">
+                                        Đóng
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        <div className="w-full md:w-1/2 flex justify-center items-center">
+                            {imgURL && <img src={imgURL} alt="Preview" className="w-40 h-40 object-cover border" />}
+                        </div>
                     </div>
                 </div>
             )}
 
+
+
+
             {isEditModalOpen && (
                 <div className="modal-overlay" onClick={resetForm}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h2 className="text-xl font-bold mb-2">Chỉnh sửa danh mục</h2>
-                        <form onSubmit={handleUpdateCategory}>
-                            <input
-                                type="text"
-                                placeholder="Tên danh mục"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="border p-2 mb-2 w-full"
-                                required
-                            />
-                            {imgURL && <img src={imgURL} alt="Hình ảnh danh mục" className="w-16 h-16 mb-2" />}
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => setImgFile(e.target.files[0])}
-                                className="border p-2 mb-2 w-full"
-                            />
-                            <div className="flex justify-between">
+                    <div className="modal max-w-none !w-[800px] p-6 bg-white rounded-lg mx-auto" onClick={(e) => e.stopPropagation()}>
+                        <h2 className="text-xl font-bold mb-4">Chỉnh sửa danh mục</h2>
+                        <form onSubmit={handleUpdateCategory} className="grid grid-cols-2 gap-4">
+                            {/* Cột 1 */}
+                            <div>
+                                <label className="block text-gray-700 mb-2">Tên danh mục</label>
+                                <input
+                                    type="text"
+                                    placeholder="Tên danh mục"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="border p-2 mb-4 w-full"
+                                    required
+                                />
+                                <label className="block text-gray-700 mb-2">Hình ảnh mới</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                        const file = e.target.files[0];
+                                        setImgFile(file);
+
+                                        // Tạo URL tạm thời để hiển thị ảnh xem trước
+                                        const newImgURL = URL.createObjectURL(file);
+                                        setImgURL(newImgURL);
+                                    }}
+                                    className="border p-2 w-full"
+                                />
+                            </div>
+
+                            {/* Cột 2 - Hiển thị ảnh */}
+                            <div className="flex flex-col items-center">
+                                <label className="block text-gray-700 mb-2">Ảnh hiện tại</label>
+                                {imgURL ? (
+                                    <img src={imgURL} alt="Hình ảnh danh mục" className="w-32 h-32 object-cover mb-4" />
+                                ) : (
+                                    <p className="text-gray-500">Chưa có hình ảnh</p>
+                                )}
+                            </div>
+
+                            {/* Nút hành động */}
+                            <div className="col-span-2 flex justify-end gap-4 mt-4">
                                 <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded">
                                     Cập nhật
                                 </button>
@@ -244,6 +283,7 @@ const DanhMucSach = () => {
                     </div>
                 </div>
             )}
+
 
             {isDeleteConfirmOpen && (
                 <div className="modal-overlay" onClick={() => setIsDeleteConfirmOpen(false)}>

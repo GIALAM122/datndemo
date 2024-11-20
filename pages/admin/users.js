@@ -67,20 +67,16 @@ const UsersPage = () => {
                             <td className="py-3 px-4 border-b text-left">{user.name}</td>
                             <td className="py-3 px-4 border-b text-left">{user.phone}</td>
                             <td className="py-3 px-4 border-b text-center">
-                                <button onClick={() => handleDeleteUser(user.id)} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition">
-                                    Xóa
-                                </button>
+                                {/* <button onClick={() => handleDeleteUser(user.id)} className="bg-red-500 text-white px-3 py-2 w-[70px] rounded hover:bg-red-600 transition">
+                                <i class="fa-solid fa-trash"></i>
+                                </button> */}
                             </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
-
-
-
         </div>
     );
 };
-
 export default UsersPage;
 UsersPage.layout = Admin;

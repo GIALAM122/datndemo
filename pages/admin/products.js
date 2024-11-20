@@ -4,6 +4,8 @@ import { db, storage } from '@/feature/firebase/firebase';
 import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Admin from "./layouts/Admin";
+import { IoIosAddCircle } from "react-icons/io";
+import { serverTimestamp } from 'firebase/firestore';
 
 export default function Dashboard() {
   const [products, setProducts] = useState([]);
@@ -26,29 +28,37 @@ export default function Dashboard() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const sortedProducts = products.sort((a, b) => b.timestamp - a.timestamp);
+  const [deleteError, setDeleteError] = useState("");
+
+  //sap xep san pham theo time moi nhat
+  // const fetchProducts = async () => {
+  //   const querySnapshot = await getDocs(collection(db, 'products'));
+  //   const productsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  //   setProducts(productsList);
+  // };
   const fetchProducts = async () => {
     const querySnapshot = await getDocs(collection(db, 'products'));
-    const productsList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const productsList = querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        timestamp: data.timestamp ? data.timestamp.toDate ? data.timestamp.toDate() : new Date(data.timestamp) : null
+      };
+    });
+    productsList.sort((a, b) => b.timestamp - a.timestamp);
     setProducts(productsList);
   };
+
+  const fetchCategories = async () => {
+    const querySnapshot = await getDocs(collection(db, 'DanhMucSach'));
+    const categoriesList = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+    setCategories(categoriesList);
+  };
   useEffect(() => {
-    const fetchProducts = async () => {
-      const querySnapshot = await getDocs(collection(db, 'products'));
-      const productsList = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setProducts(productsList);
-    };
-    const fetchCategories = async () => {
-      const querySnapshot = await getDocs(collection(db, 'DanhMucSach'));
-      const categoriesList = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setCategories(categoriesList);
-    };
     fetchProducts();
     fetchCategories();
   }, []);
@@ -71,21 +81,27 @@ export default function Dashboard() {
         releaseDate,
         mota: description,
         categories: selectedCategories,
-        timestamp: timestamp.toISOString(),
+        timestamp: serverTimestamp(),
+        visible: true
       });
+
       setProducts([...products, { name, price: parseFloat(price), author, publisher, releaseDate, mota: description, img: url, categories: selectedCategories, timestamp: timestamp.toISOString() }]);
       await fetchProducts();
       resetForm();
+
     } catch (error) {
       console.error("Error adding document: ", error);
     }
   };
 
+  //Sửa sản phẩm
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
     if (!name || !price || !author || !selectedCategories.length || !description || !currentProduct) return;
+
     try {
       let url = imageURL;
+
       if (imageFile) {
         const storageRef = ref(storage, `images/${imageFile.name}`);
         await uploadBytes(storageRef, imageFile);
@@ -102,17 +118,38 @@ export default function Dashboard() {
         mota: description,
         img: url,
       });
+
       setProducts(products.map((product) =>
         product.id === currentProduct.id
           ? { ...product, name, price: parseFloat(price), author, publisher, releaseDate, categories: selectedCategories, mota: description, img: url }
           : product
       ));
       resetForm();
+      await fetchProducts();
       setIsEditModalOpen(false);
     } catch (error) {
       console.error("Error updating document: ", error);
     }
+
   };
+
+  //Ẩn/Hiện sản phẩm
+  const toggleProductVisibility = async (productId, currentVisibility) => {
+    try {
+      await updateDoc(doc(db, 'products', productId), {
+        visible: !currentVisibility
+      });
+      setProducts(products.map(product =>
+        product.id === productId ? { ...product, visible: !currentVisibility } : product
+      ));
+    } catch (error) {
+      console.error("Error updating visibility: ", error);
+    }
+    await fetchProducts();
+  };
+
+
+
   const handleOpenEditModal = (product) => {
     setCurrentProduct(product);
     setName(product.name);
@@ -125,14 +162,28 @@ export default function Dashboard() {
     setImageURL(product.img);
     setIsEditModalOpen(true);
   };
+
+  //xóa sản phẩm
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
+
+    // Tìm sản phẩm cần xóa trong danh sách sản phẩm hiện có
+    const product = products.find(p => p.id === productToDelete);
+
+    // Kiểm tra nếu sản phẩm vẫn đang hiển thị
+    if (!product || product.visible) {
+      setDeleteError("Sản phẩm phải được ẩn trước khi xóa.");
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, 'products', productToDelete));
       setProducts(products.filter(product => product.id !== productToDelete));
       closeDeleteModal();
+      setDeleteError(""); // Xóa lỗi sau khi xóa thành công
     } catch (error) {
       console.error("Error deleting document: ", error);
+      setDeleteError("Có lỗi xảy ra khi xóa sản phẩm.");
     }
   };
 
@@ -152,6 +203,7 @@ export default function Dashboard() {
     setIsEditModalOpen(false);
   };
 
+  //tìm kiếm sản phẩm
   const handleSearch = (term) => {
     setSearchTerm(term);
     setCurrentPage(1);
@@ -173,10 +225,15 @@ export default function Dashboard() {
     setIsDeleteModalOpen(false);
   };
 
+
+
+
+
   const indexOfLastProduct = currentPage * productsPerPage;
   const indexOfFirstProduct = indexOfLastProduct - productsPerPage;
   const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
+
   return (
     <div className="relative container mx-auto p-4 mb-6 top-[100px]">
       <h1 className="text-2xl font-bold mb-4">QUẢN LÝ SÁCH</h1>
@@ -186,44 +243,57 @@ export default function Dashboard() {
         onChange={(e) => handleSearch(e.target.value)}
         className="border p-2 mb-4 w-full"
       />
+
       <button
         onClick={() => setIsAddModalOpen(true)}
-        className="bg-blue-500 text-white px-4 py-2 rounded mb-4"
+        className="bg-blue-500 text-white px-4 py-2 rounded mb-4 flex items-center"
       >
+        <IoIosAddCircle className="mr-2" />
         Thêm sản phẩm mới
       </button>
+
+
       <table className="min-w-full bg-white border border-gray-300 shadow-md rounded-lg table-auto">
         <thead>
-          <tr className="bg-blue-500 text-white">
-            <th className="py-4 px-6 border-b text-left">Tên sản phẩm</th>
-            <th className="py-4 px-6 border-b text-left">Giá</th>
-            <th className="py-4 px-6 border-b text-center">Hình ảnh</th>
-            <th className="py-4 px-6 border-b text-center">Hành động</th>
+          <tr className="bg-blue-600 text-white">
+            <th className="py-4 px-6 border-b text-left whitespace-nowrap w-1/3">Tên sản phẩm</th>
+            <th className="py-4 px-6 border-b text-left whitespace-nowrap w-1/4">Giá</th>
+            <th className="py-4 px-6 border-b text-center whitespace-nowrap w-1/4">Hình ảnh</th>
+            <th className="py-4 px-6 border-b text-center whitespace-nowrap w-1/4">Hành động</th>
           </tr>
         </thead>
         <tbody>
-          {currentProducts.map(product => (
-            <tr key={product.id} className="hover:bg-gray-100 transition-colors">
+          {currentProducts.map((product, index) => (
+            <tr
+              key={product.id}
+              className={`hover:bg-gray-100 transition-colors ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}
+            >
               <td className="py-4 px-6 border-b text-left font-semibold">{product.name}</td>
               <td className="py-4 px-6 border-b text-left text-red-500 font-bold">
                 {product.price.toLocaleString("vi-VN")} vn₫
               </td>
               <td className="py-4 px-14 border-b text-center">
-                <img src={product.img} alt={product.name} className="w-16 h-16 object-cover rounded" />
+                <img src={product.img} alt={product.name} className="w-16 h-16 object-cover rounded-lg shadow-md" />
               </td>
               <td className="py-4 px-6 border-b text-center">
                 <div className="flex justify-center space-x-2">
                   <button
                     onClick={() => handleOpenEditModal(product)}
-                    className="bg-yellow-400 text-white px-4 py-2 rounded shadow hover:bg-yellow-500 transition w-24"
+                    className="bg-yellow-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-yellow-600 transition w-24"
                   >
-                        <i className="fas fa-pen"></i>
+                    <i className="fa-solid fa-pen"></i>
+                  </button>
+                  <button
+                    onClick={() => toggleProductVisibility(product.id, product.visible)}
+                    className={`px-4 py-2 rounded-lg shadow-md w-24 ${product.visible ? "bg-green-500" : "bg-gray-400"} text-white hover:bg-opacity-90`}
+                  >
+                    {product.visible ? <i className="fa-solid fa-eye"></i> : <i className="fa-solid fa-eye-slash"></i>}
                   </button>
                   <button
                     onClick={() => openDeleteModal(product.id)}
-                    className="bg-red-500 text-white px-4 py-2 rounded shadow hover:bg-red-600 transition w-24"
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg shadow-md hover:bg-red-600 transition w-24"
                   >
-                       <i className="fas fa-trash"></i>
+                    <i className="fa-solid fa-trash"></i>
                   </button>
                 </div>
               </td>
@@ -235,8 +305,7 @@ export default function Dashboard() {
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
-            <h2 className="text-xl font-bold mb-4" >
-              Thêm sản phẩm mới</h2>
+            <h2 className="text-xl font-bold mb-4">Thêm sản phẩm mới</h2>
             <form onSubmit={handleAddProduct}>
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="col-span-2 grid grid-cols-2 gap-4">
@@ -367,8 +436,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-
       {isEditModalOpen && currentProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-7xl"> {/* Mở rộng chiều rộng modal */}
@@ -433,7 +500,6 @@ export default function Dashboard() {
                       />
                     </div>
                   </div>
-
                   <div className="flex flex-wrap gap-2 mb-4">
                     {categories.map((category) => (
                       <button
@@ -509,32 +575,50 @@ export default function Dashboard() {
         </div>
       )}
 
-
-
-
-
       {isDeleteModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md text-center">
             <h2 className="text-lg font-bold mb-4">Bạn có chắc chắn muốn xóa sản phẩm này?</h2>
+
+            {/* Hiển thị lỗi nếu sản phẩm chưa ẩn */}
+            {deleteError && <p className="text-red-500 mb-4">{deleteError}</p>}
+
             <div className="flex justify-center">
-              <button
-                onClick={handleDeleteProduct}
-                className="bg-red-500 text-white px-4 py-2 rounded shadow hover:bg-red-600 transition mr-2"
-              >
-                Xóa
-              </button>
-              <button
-                onClick={closeDeleteModal}
-                className="bg-gray-300 text-black px-4 py-2 rounded shadow hover:bg-gray-400 transition"
-              >
-                Hủy
-              </button>
+              {deleteError ? (
+                // Chỉ hiển thị nút "OK" khi có lỗi
+                <button
+                  onClick={() => {
+                    closeDeleteModal();
+                    setDeleteError(""); // Đặt lại lỗi khi đóng modal
+                  }}
+                  className="bg-blue-500 text-white px-4 py-2 rounded shadow hover:bg-blue-600 transition"
+                >
+                  OK
+                </button>
+              ) : (
+                // Hiển thị nút "Xóa" và "Hủy" khi không có lỗi
+                <>
+                  <button
+                    onClick={handleDeleteProduct}
+                    className="bg-red-500 text-white px-4 py-2 rounded shadow hover:bg-red-600 transition mr-2"
+                  >
+                    Xóa
+                  </button>
+                  <button
+                    onClick={() => {
+                      closeDeleteModal();
+                      setDeleteError(""); // Đặt lại lỗi khi đóng modal
+                    }}
+                    className="bg-gray-300 text-black px-4 py-2 rounded shadow hover:bg-gray-400 transition"
+                  >
+                    Hủy
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
       )}
-
       {/* Pagination */}
       <div className="flex justify-between mt-4">
         <button
@@ -558,5 +642,4 @@ export default function Dashboard() {
     </div>
   );
 }
-
 Dashboard.layout = Admin;
